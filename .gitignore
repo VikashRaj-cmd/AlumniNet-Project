@@ -1,9 +1,3 @@
-# Manual setup docs and Viva guide (local only, never commit)
-Backend/manual_setup.md
-manual_setup.md
-PROJECT_VIVA_GUIDE.md
-VIVA_PREPARATION_GUIDE.md
-
 # Dependencies
 node_modules/
 Frontend/node_modules/
