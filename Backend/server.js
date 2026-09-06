@@ -15,6 +15,12 @@ const config = require('./config/config');
 const { errorHandler, notFoundHandler } = require('./middleware/errorMiddleware');
 const { initializeSocket } = require('./socket/chatSocket');
 
+const path = require('path');
+const mongoose = require('mongoose');
+const setupSwagger = require('./swagger');
+const { isCloudinaryConfigured } = require('./config/storage');
+const { getRedis } = require('./config/redis');
+
 // Route imports
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -33,8 +39,16 @@ const app = express();
 connectDB();
 connectRedis();
 
+// ─── STATIC UPLOADS FOLDER SERVING ───────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ─── SWAGGER API DOCUMENTATION ────────────────────────────────────
+setupSwagger(app);
+
 // ─── SECURITY MIDDLEWARE ──────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Allows Swagger UI to render smoothly
+}));
 
 app.use(cors({
   origin: config.frontendUrl,
@@ -74,12 +88,27 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// ─── HEALTH CHECK ─────────────────────────────────────────────────
+// ─── ENHANCED HEALTH MONITORING ───────────────────────────────────
 app.get('/api/health', (req, res) => {
+  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  const redisConnected = !!getRedis();
+
   res.json({
     status: 'ok',
     environment: config.nodeEnv,
     timestamp: new Date().toISOString(),
+    uptime: `${Math.floor(process.uptime())}s`,
+    database: {
+      mongodb: mongoStatus,
+      redis: redisConnected ? 'connected' : 'disabled/offline',
+    },
+    storage: {
+      mode: isCloudinaryConfigured ? 'cloudinary' : 'local_disk',
+    },
+    memoryUsage: {
+      rss: `${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+    },
   });
 });
 
