@@ -8,15 +8,16 @@ const {
 } = require('../controllers/alumniController');
 const { protect } = require('../middleware/authMiddleware');
 const { validateObjectId } = require('../middleware/validationMiddleware');
+const { cacheMiddleware } = require('../middleware/cacheMiddleware');
 const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
 
-router.get('/search', searchAlumni);          // GET /api/alumni/search?q=google&department=CSE&batch=2020
-router.get('/filters/departments', getDepartments);
-router.get('/filters/batches', getBatches);
-router.get('/filters/companies', getCompanies);
-router.get('/:id', validateObjectId, getAlumniById);
+router.get('/search', cacheMiddleware(300), searchAlumni);          // GET /api/alumni/search?q=google&department=CSE&batch=2020 (5m cache)
+router.get('/filters/departments', cacheMiddleware(600), getDepartments); // 10m cache
+router.get('/filters/batches', cacheMiddleware(600), getBatches);         // 10m cache
+router.get('/filters/companies', cacheMiddleware(600), getCompanies);     // 10m cache
+router.get('/:id', validateObjectId, cacheMiddleware(300), getAlumniById);
 
 module.exports = router;

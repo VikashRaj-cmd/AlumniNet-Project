@@ -10,6 +10,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
+const { connectRedis } = require('./config/redis');
 const config = require('./config/config');
 const { errorHandler, notFoundHandler } = require('./middleware/errorMiddleware');
 const { initializeSocket } = require('./socket/chatSocket');
@@ -28,8 +29,9 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-// ─── CONNECT DATABASE ─────────────────────────────────────────────
+// ─── CONNECT DATABASE & CACHE ──────────────────────────────────────
 connectDB();
+connectRedis();
 
 // ─── SECURITY MIDDLEWARE ──────────────────────────────────────────
 app.use(helmet());
