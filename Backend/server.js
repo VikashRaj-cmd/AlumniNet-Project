@@ -32,6 +32,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const alumniRoutes = require('./routes/alumniRoutes');
 const donationRoutes = require('./routes/donationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const resumeRoutes = require('./routes/resumeRoutes');
 
 const app = express();
 
@@ -56,8 +57,8 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(mongoSanitize());
 app.use(hpp());
 
@@ -123,6 +124,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/alumni', alumniRoutes);
 app.use('/api/donations', donationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/resume', resumeRoutes);
 
 // ─── ERROR HANDLING ───────────────────────────────────────────────
 app.use(notFoundHandler);

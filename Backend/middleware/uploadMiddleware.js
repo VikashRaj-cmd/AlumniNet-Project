@@ -45,11 +45,11 @@ const resumeFilter = (req, file, cb) => {
   }
 };
 
-// Multer Upload Instances
+// Multer Upload Instances (All set to 10 MB limit)
 const uploadAvatar = multer({
   storage,
   fileFilter: imageFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
 }).single('avatar');
 
 const uploadResume = multer({
