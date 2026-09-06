@@ -1,5 +1,7 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -10,6 +12,7 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
 const config = require('./config/config');
 const { errorHandler, notFoundHandler } = require('./middleware/errorMiddleware');
+const { initializeSocket } = require('./socket/chatSocket');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
@@ -17,34 +20,26 @@ const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const internshipRoutes = require('./routes/internshipRoutes');
 const mentorshipRoutes = require('./routes/mentorshipRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
-// ─── CONNECT DATABASE ────────────────────────────────────────────
+// ─── CONNECT DATABASE ─────────────────────────────────────────────
 connectDB();
 
-// ─── SECURITY MIDDLEWARE ─────────────────────────────────────────
-
-// Set security HTTP headers
+// ─── SECURITY MIDDLEWARE ──────────────────────────────────────────
 app.use(helmet());
 
-// CORS configuration
 app.use(cors({
   origin: config.frontendUrl,
-  credentials: true, // Allow cookies (for refresh tokens)
+  credentials: true,
 }));
 
-// Parse cookies (needed for refresh tokens)
 app.use(cookieParser());
-
-// Body parser — limit request body size
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-
-// Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
-
-// Prevent HTTP parameter pollution
 app.use(hpp());
 
 // ─── LOGGING ─────────────────────────────────────────────────────
@@ -54,36 +49,27 @@ if (config.nodeEnv === 'development') {
   app.use(morgan('combined'));
 }
 
-// ─── RATE LIMITING ───────────────────────────────────────────────
-
-// Global rate limiter: 100 requests per 15 minutes per IP
+// ─── RATE LIMITING ────────────────────────────────────────────────
 const globalLimiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
   max: config.rateLimitMax,
-  message: {
-    status: 'fail',
-    message: 'Too many requests from this IP, please try again later.',
-  },
+  message: { status: 'fail', message: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api', globalLimiter);
 
-// Stricter rate limiter for auth routes: 10 attempts per 15 minutes
 const authLimiter = rateLimit({
   windowMs: config.authRateLimitWindowMs,
   max: config.authRateLimitMax,
-  message: {
-    status: 'fail',
-    message: 'Too many login attempts, please try again after 15 minutes.',
-  },
+  message: { status: 'fail', message: 'Too many login attempts, please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// ─── HEALTH CHECK ────────────────────────────────────────────────
+// ─── HEALTH CHECK ─────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -92,23 +78,41 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─── API ROUTES ──────────────────────────────────────────────────
+// ─── API ROUTES ───────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/internships', internshipRoutes);
 app.use('/api/mentors', mentorshipRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-// ─── ERROR HANDLING ──────────────────────────────────────────────
-
-// Handle 404 — undefined routes
+// ─── ERROR HANDLING ───────────────────────────────────────────────
 app.use(notFoundHandler);
-
-// Global error handler (MUST be last middleware)
 app.use(errorHandler);
 
-// ─── START SERVER ────────────────────────────────────────────────
+// ─── HTTP + SOCKET.IO SERVER ──────────────────────────────────────
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: config.frontendUrl,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+// Initialize Socket.io event handlers
+initializeSocket(io);
+
+// Make `io` accessible in controllers via req.app.get('io')
+app.set('io', io);
+
+// ─── START SERVER ─────────────────────────────────────────────────
 const PORT = config.port;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running in ${config.nodeEnv} mode on port ${PORT}`);
+  console.log(`🔌 Socket.io ready for real-time connections`);
 });
