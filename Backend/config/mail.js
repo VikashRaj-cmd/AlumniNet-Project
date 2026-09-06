@@ -1,4 +1,4 @@
-// TODO: MANUAL SETUP REQUIRED — See Backend/manual_setup.md (Section 1: Email/SMTP Setup)
+// TODO: MANUAL SETUP REQUIRED — See manual_setup.md in root directory (Section 1: Email/SMTP Setup)
 // Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_EMAIL to your .env file
 // Without these, emails are skipped silently (server still works normally)
 const nodemailer = require('nodemailer');

@@ -1,4 +1,4 @@
-// TODO: MANUAL SETUP REQUIRED — See Backend/manual_setup.md (Section 3: Redis Setup)
+// TODO: MANUAL SETUP REQUIRED — See manual_setup.md in root directory (Section 3: Redis Setup)
 // Caching middleware automatically caches GET endpoint responses in Redis with configurable TTLs.
 // If Redis is not connected, cache middleware acts as a standard no-op pass-through.
 

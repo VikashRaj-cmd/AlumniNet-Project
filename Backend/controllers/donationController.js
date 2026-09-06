@@ -1,4 +1,4 @@
-// TODO: MANUAL SETUP REQUIRED — See Backend/manual_setup.md (Section 2: Razorpay Setup)
+// TODO: MANUAL SETUP REQUIRED — See manual_setup.md in root directory (Section 2: Razorpay Setup)
 // Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file
 // Without these, donation APIs return 503 (server still works normally for all other features)
 const Razorpay = require('razorpay');

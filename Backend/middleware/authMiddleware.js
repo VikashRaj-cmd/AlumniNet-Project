@@ -14,7 +14,14 @@ exports.protect = async (req, res, next) => {
       return next(new AppError('You are not logged in. Please log in to get access.', 401));
     }
 
-    // 2) Verify token
+    // 2) Check if token is blacklisted in Redis
+    const { isTokenBlacklisted } = require('../config/redis');
+    const blacklisted = await isTokenBlacklisted(token);
+    if (blacklisted) {
+      return next(new AppError('Token has been revoked. Please log in again.', 401));
+    }
+
+    // 3) Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // 3) Check if user still exists

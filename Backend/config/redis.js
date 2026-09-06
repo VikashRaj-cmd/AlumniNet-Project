@@ -1,4 +1,4 @@
-// TODO: MANUAL SETUP REQUIRED — See Backend/manual_setup.md (Section 3: Redis Setup)
+// TODO: MANUAL SETUP REQUIRED — See manual_setup.md in root directory (Section 3: Redis Setup)
 // Add REDIS_URL to your .env file
 // Without Redis, caching is disabled gracefully — server works normally
 
@@ -99,6 +99,63 @@ const deleteCachePattern = async (pattern) => {
   }
 };
 
+// ─── ONLINE USER TRACKING (SESSION MANAGEMENT) ─────────────────────
+
+const addOnlineUser = async (userId, socketId) => {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    await client.hset('online_users', userId, socketId);
+  } catch (err) {
+    console.warn(`[REDIS] addOnlineUser error: ${err.message}`);
+  }
+};
+
+const removeOnlineUser = async (userId) => {
+  const client = getRedis();
+  if (!client) return;
+  try {
+    await client.hdel('online_users', userId);
+  } catch (err) {
+    console.warn(`[REDIS] removeOnlineUser error: ${err.message}`);
+  }
+};
+
+const getOnlineUsersRedis = async () => {
+  const client = getRedis();
+  if (!client) return [];
+  try {
+    const users = await client.hkeys('online_users');
+    return users;
+  } catch (err) {
+    console.warn(`[REDIS] getOnlineUsers error: ${err.message}`);
+    return [];
+  }
+};
+
+// ─── TOKEN BLACKLIST & OTP / RESET TOKEN MANAGEMENT ───────────────
+
+const blacklistToken = async (token, ttlSeconds = 604800) => {
+  await setCache(`blacklist:${token}`, true, ttlSeconds);
+};
+
+const isTokenBlacklisted = async (token) => {
+  const result = await getCache(`blacklist:${token}`);
+  return !!result;
+};
+
+const setOtp = async (identifier, otp, ttlSeconds = 600) => {
+  await setCache(`otp:${identifier}`, otp, ttlSeconds);
+};
+
+const getOtp = async (identifier) => {
+  return await getCache(`otp:${identifier}`);
+};
+
+const deleteOtp = async (identifier) => {
+  await deleteCache(`otp:${identifier}`);
+};
+
 module.exports = {
   connectRedis,
   getRedis,
@@ -106,4 +163,12 @@ module.exports = {
   getCache,
   deleteCache,
   deleteCachePattern,
+  addOnlineUser,
+  removeOnlineUser,
+  getOnlineUsersRedis,
+  blacklistToken,
+  isTokenBlacklisted,
+  setOtp,
+  getOtp,
+  deleteOtp,
 };

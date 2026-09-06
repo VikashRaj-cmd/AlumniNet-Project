@@ -120,6 +120,17 @@ exports.logout = async (req, res, next) => {
     if (refreshToken) {
       await RefreshToken.findOneAndUpdate({ token: refreshToken }, { isRevoked: true });
     }
+
+    // Blacklist access token in Redis if provided
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+      if (token) {
+        const { blacklistToken } = require('../config/redis');
+        await blacklistToken(token, 900); // 15 min TTL matching access token lifespan
+      }
+    }
+
     res.clearCookie('refreshToken');
     res.json({ message: 'Logged out successfully.' });
   } catch (error) {
@@ -151,15 +162,20 @@ exports.forgotPassword = async (req, res, next) => {
     // Generate a secure random reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
 
-    // Hash the token before storing (don't store plain token in DB)
-    user.resetPasswordToken = crypto
+    // Hash the token before storing
+    const hashedToken = crypto
       .createHash('sha256')
       .update(resetToken)
       .digest('hex');
 
-    // Token expires in 15 minutes
+    // Store in DB
+    user.resetPasswordToken = hashedToken;
     user.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
+
+    // Store in Redis with 15 min TTL (900 seconds)
+    const { setOtp } = require('../config/redis');
+    await setOtp(`reset:${hashedToken}`, user._id.toString(), 900);
 
     // Send reset email with plain token (not hashed)
     await sendPasswordResetEmail(user, resetToken);
@@ -183,10 +199,18 @@ exports.resetPassword = async (req, res, next) => {
     // Hash the incoming token to compare with stored hash
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpire: { $gt: Date.now() },
-    });
+    const { getOtp, deleteOtp } = require('../config/redis');
+    const redisUserId = await getOtp(`reset:${hashedToken}`);
+
+    let user;
+    if (redisUserId) {
+      user = await User.findById(redisUserId);
+    } else {
+      user = await User.findOne({
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: { $gt: Date.now() },
+      });
+    }
 
     if (!user) {
       return next(new AppError('Password reset token is invalid or has expired.', 400));
@@ -197,6 +221,9 @@ exports.resetPassword = async (req, res, next) => {
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();
+
+    // Clean up Redis token
+    await deleteOtp(`reset:${hashedToken}`);
 
     // Issue new access token so user is logged in after reset
     const accessToken = generateAccessToken(user._id);

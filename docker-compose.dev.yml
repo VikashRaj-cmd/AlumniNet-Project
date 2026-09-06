@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: alumninet-mongo-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data_dev:/data/db
+    networks:
+      - alumninet-dev-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: alumninet-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - alumninet-dev-network
+
+  backend:
+    image: node:20-alpine
+    container_name: alumninet-backend-dev
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./Backend:/app
+      - /app/node_modules
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/alumninet
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev_jwt_secret_key_12345
+      - FRONTEND_URL=http://localhost:5173
+    command: npm run dev
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - alumninet-dev-network
+
+  frontend:
+    image: node:20-alpine
+    container_name: alumninet-frontend-dev
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - backend
+    networks:
+      - alumninet-dev-network
+
+volumes:
+  mongo_data_dev:
+
+networks:
+  alumninet-dev-network:
+    driver: bridge

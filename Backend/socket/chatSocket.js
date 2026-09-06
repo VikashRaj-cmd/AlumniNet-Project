@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { addOnlineUser, removeOnlineUser, getOnlineUsersRedis } = require('../config/redis');
 
-// Track online users: { userId: socketId }
+// Track online users: in-memory fallback
 const onlineUsers = new Map();
 
 const initializeSocket = (io) => {
@@ -30,17 +31,16 @@ const initializeSocket = (io) => {
   });
 
   // ─── CONNECTION HANDLER ─────────────────────────────────────────
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = socket.user._id.toString();
     console.log(`[SOCKET] Connected: ${socket.user.name} (${userId})`);
 
     // ─── JOIN PERSONAL ROOM ───────────────────────────────────────
-    // Each user joins a room named after their userId
-    // This allows direct message targeting: io.to(userId).emit(...)
     socket.join(userId);
 
-    // ─── TRACK ONLINE STATUS ─────────────────────────────────────
+    // ─── TRACK ONLINE STATUS (REDIS + IN-MEMORY FALLBACK) ──────────
     onlineUsers.set(userId, socket.id);
+    await addOnlineUser(userId, socket.id);
 
     // Broadcast online status to all connected users
     io.emit('userOnline', {
@@ -49,7 +49,9 @@ const initializeSocket = (io) => {
     });
 
     // Send current online users list to the newly connected user
-    socket.emit('onlineUsers', Array.from(onlineUsers.keys()));
+    const redisOnlineUsers = await getOnlineUsersRedis();
+    const activeUsersList = redisOnlineUsers.length > 0 ? redisOnlineUsers : Array.from(onlineUsers.keys());
+    socket.emit('onlineUsers', activeUsersList);
 
     // ─── JOIN CONVERSATION ROOM ───────────────────────────────────
     socket.on('joinRoom', (conversationId) => {
@@ -65,7 +67,6 @@ const initializeSocket = (io) => {
 
     // ─── TYPING INDICATORS ───────────────────────────────────────
     socket.on('typing', ({ conversationId, receiverId }) => {
-      // Emit to the receiver's personal room
       socket.to(receiverId).emit('userTyping', {
         userId,
         name: socket.user.name,
@@ -81,11 +82,12 @@ const initializeSocket = (io) => {
     });
 
     // ─── DISCONNECT ──────────────────────────────────────────────
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`[SOCKET] Disconnected: ${socket.user.name} (${userId})`);
 
-      // Remove from online users
+      // Remove from online users (Redis + In-Memory)
       onlineUsers.delete(userId);
+      await removeOnlineUser(userId);
 
       // Broadcast offline status
       io.emit('userOffline', {
@@ -97,7 +99,10 @@ const initializeSocket = (io) => {
   });
 };
 
-// Get current online users (used by other modules if needed)
-const getOnlineUsers = () => Array.from(onlineUsers.keys());
+// Get current online users
+const getOnlineUsers = async () => {
+  const redisUsers = await getOnlineUsersRedis();
+  return redisUsers.length > 0 ? redisUsers : Array.from(onlineUsers.keys());
+};
 
 module.exports = { initializeSocket, getOnlineUsers };
