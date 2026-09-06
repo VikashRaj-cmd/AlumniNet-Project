@@ -1,10 +1,10 @@
 const Mentor = require('../models/Mentor');
 
-exports.getAllMentors = async (req, res) => {
+exports.getAllMentors = async (req, res, next) => {
   try {
     const mentors = await Mentor.find();
     res.json(mentors);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };

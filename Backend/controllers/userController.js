@@ -1,24 +1,28 @@
 const User = require('../models/User');
+const { AppError } = require('../middleware/errorMiddleware');
 
-exports.getProfile = async (req, res) => {
+exports.getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return next(new AppError('User not found.', 404));
+    }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-exports.getAllAlumni = async (req, res) => {
+exports.getAllAlumni = async (req, res, next) => {
   try {
     const alumni = await User.find({ role: 'alumni' }).select('-password');
     res.json(alumni);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-exports.getStats = async (req, res) => {
+exports.getStats = async (req, res, next) => {
   try {
     const Event = require('../models/Event');
     const Internship = require('../models/Internship');
@@ -31,15 +35,26 @@ exports.getStats = async (req, res) => {
     ]);
     res.json({ alumniCount, eventsCount, jobsCount, mentorCount });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-exports.updateProfile = async (req, res) => {
+exports.updateProfile = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndUpdate(req.user._id, req.body, { new: true }).select('-password');
+    // Prevent role/password changes via this route
+    const { password, role, ...updateData } = req.body;
+
+    const user = await User.findByIdAndUpdate(req.user._id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select('-password');
+
+    if (!user) {
+      return next(new AppError('User not found.', 404));
+    }
+
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };

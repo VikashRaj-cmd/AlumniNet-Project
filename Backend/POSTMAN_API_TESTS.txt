@@ -1,0 +1,450 @@
+================================================================
+        ALUMNINET - POSTMAN API TEST COLLECTION
+================================================================
+Base URL: http://localhost:5000/api
+Variable:  {{baseUrl}} = http://localhost:5000/api
+
+NOTE: After login/register, copy the token from response
+      and set it as Bearer Token in Authorization tab
+      for all protected routes.
+================================================================
+
+
+================================================================
+📁 FOLDER 1: AUTH
+================================================================
+
+--------------------------------------------------
+1. Register User
+--------------------------------------------------
+Name    : Register User
+Method  : POST
+URL     : {{baseUrl}}/auth/register
+Auth    : No Auth
+Body    : raw → JSON
+
+{
+  "name": "Rahul Sharma",
+  "email": "rahul@example.com",
+  "password": "password123",
+  "role": "alumni",
+  "batch": "2020",
+  "department": "Computer Science"
+}
+
+Expected Response (201):
+{
+  "_id": "...",
+  "name": "Rahul Sharma",
+  "email": "rahul@example.com",
+  "role": "alumni",
+  "department": "Computer Science",
+  "batch": "2020",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+--------------------------------------------------
+2. Register Student
+--------------------------------------------------
+Name    : Register Student
+Method  : POST
+URL     : {{baseUrl}}/auth/register
+Auth    : No Auth
+Body    : raw → JSON
+
+{
+  "name": "Priya Singh",
+  "email": "priya@example.com",
+  "password": "password123",
+  "role": "student",
+  "batch": "2024",
+  "department": "Information Technology"
+}
+
+Expected Response (201):
+{
+  "_id": "...",
+  "name": "Priya Singh",
+  "email": "priya@example.com",
+  "role": "student",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+--------------------------------------------------
+3. Login User
+--------------------------------------------------
+Name    : Login User
+Method  : POST
+URL     : {{baseUrl}}/auth/login
+Auth    : No Auth
+Body    : raw → JSON
+
+{
+  "email": "rahul@example.com",
+  "password": "password123"
+}
+
+Expected Response (200):
+{
+  "_id": "...",
+  "name": "Rahul Sharma",
+  "email": "rahul@example.com",
+  "role": "alumni",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+--------------------------------------------------
+4. Login - Invalid Credentials
+--------------------------------------------------
+Name    : Login Invalid
+Method  : POST
+URL     : {{baseUrl}}/auth/login
+Auth    : No Auth
+Body    : raw → JSON
+
+{
+  "email": "wrong@example.com",
+  "password": "wrongpassword"
+}
+
+Expected Response (401):
+{
+  "message": "Invalid credentials"
+}
+
+
+================================================================
+📁 FOLDER 2: USERS
+================================================================
+
+--------------------------------------------------
+5. Get My Profile
+--------------------------------------------------
+Name    : Get Profile
+Method  : GET
+URL     : {{baseUrl}}/users/profile
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+{
+  "_id": "...",
+  "name": "Rahul Sharma",
+  "email": "rahul@example.com",
+  "role": "alumni",
+  "batch": "2020",
+  "department": "Computer Science",
+  "company": null,
+  "designation": null,
+  ...
+}
+
+--------------------------------------------------
+6. Update Profile
+--------------------------------------------------
+Name    : Update Profile
+Method  : PUT
+URL     : {{baseUrl}}/users/profile
+Auth    : Bearer Token → <paste token from login>
+Body    : raw → JSON
+
+{
+  "company": "Google",
+  "designation": "Software Engineer",
+  "phone": "9876543210",
+  "linkedin": "https://linkedin.com/in/rahulsharma",
+  "github": "https://github.com/rahulsharma",
+  "skills": ["React", "Node.js", "MongoDB"]
+}
+
+Expected Response (200):
+{
+  "_id": "...",
+  "name": "Rahul Sharma",
+  "company": "Google",
+  "designation": "Software Engineer",
+  ...
+}
+
+--------------------------------------------------
+7. Get All Alumni
+--------------------------------------------------
+Name    : Get All Alumni
+Method  : GET
+URL     : {{baseUrl}}/users/alumni
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+[
+  {
+    "_id": "...",
+    "name": "Rahul Sharma",
+    "role": "alumni",
+    "company": "Google",
+    ...
+  },
+  ...
+]
+
+--------------------------------------------------
+8. Get Dashboard Stats
+--------------------------------------------------
+Name    : Get Stats
+Method  : GET
+URL     : {{baseUrl}}/users/stats
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+{
+  "alumniCount": 6,
+  "eventsCount": 4,
+  "jobsCount": 5,
+  "mentorCount": 4
+}
+
+
+================================================================
+📁 FOLDER 3: EVENTS
+================================================================
+
+--------------------------------------------------
+9. Get All Events
+--------------------------------------------------
+Name    : Get All Events
+Method  : GET
+URL     : {{baseUrl}}/events
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+[
+  {
+    "_id": "...",
+    "title": "Annual Alumni Meet 2026",
+    "description": "...",
+    "date": "2026-04-15T00:00:00.000Z",
+    "location": "Main Auditorium",
+    "organizer": { "name": "...", "email": "..." },
+    "registeredUsers": []
+  },
+  ...
+]
+
+--------------------------------------------------
+10. Create Event
+--------------------------------------------------
+Name    : Create Event
+Method  : POST
+URL     : {{baseUrl}}/events
+Auth    : Bearer Token → <paste token from login>
+Body    : raw → JSON
+
+{
+  "title": "Tech Workshop 2026",
+  "description": "A hands-on workshop on full stack development for students.",
+  "date": "2026-05-10",
+  "location": "Lab Block A"
+}
+
+Expected Response (201):
+{
+  "_id": "...",
+  "title": "Tech Workshop 2026",
+  "description": "A hands-on workshop on full stack development for students.",
+  "date": "2026-05-10T00:00:00.000Z",
+  "location": "Lab Block A",
+  "organizer": "...",
+  "registeredUsers": []
+}
+
+--------------------------------------------------
+11. Register for Event
+--------------------------------------------------
+Name    : Register for Event
+Method  : POST
+URL     : {{baseUrl}}/events/<event_id>/register
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+NOTE: Replace <event_id> with actual _id from Get All Events response
+
+Expected Response (200):
+{
+  "_id": "...",
+  "title": "Annual Alumni Meet 2026",
+  "registeredUsers": ["<your_user_id>"]
+}
+
+
+================================================================
+📁 FOLDER 4: JOBS / INTERNSHIPS
+================================================================
+
+--------------------------------------------------
+12. Get All Jobs
+--------------------------------------------------
+Name    : Get All Jobs
+Method  : GET
+URL     : {{baseUrl}}/internships
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+[
+  {
+    "_id": "...",
+    "title": "Frontend Developer",
+    "company": "Google",
+    "description": "...",
+    "location": "Bangalore",
+    "type": "job",
+    "applicants": [],
+    "postedBy": { "name": "...", "company": "..." }
+  },
+  ...
+]
+
+--------------------------------------------------
+13. Create Job Posting
+--------------------------------------------------
+Name    : Create Job
+Method  : POST
+URL     : {{baseUrl}}/internships
+Auth    : Bearer Token → <paste token from login>
+Body    : raw → JSON
+
+{
+  "title": "React Developer",
+  "company": "Infosys",
+  "description": "Looking for a skilled React developer with 1+ years experience.",
+  "location": "Pune",
+  "type": "job"
+}
+
+Expected Response (201):
+{
+  "_id": "...",
+  "title": "React Developer",
+  "company": "Infosys",
+  "type": "job",
+  "applicants": [],
+  "postedBy": "..."
+}
+
+--------------------------------------------------
+14. Create Internship Posting
+--------------------------------------------------
+Name    : Create Internship
+Method  : POST
+URL     : {{baseUrl}}/internships
+Auth    : Bearer Token → <paste token from login>
+Body    : raw → JSON
+
+{
+  "title": "ML Intern",
+  "company": "TCS",
+  "description": "3 month internship on machine learning projects.",
+  "location": "Chennai",
+  "type": "internship"
+}
+
+Expected Response (201):
+{
+  "_id": "...",
+  "title": "ML Intern",
+  "company": "TCS",
+  "type": "internship",
+  "applicants": []
+}
+
+--------------------------------------------------
+15. Apply for Job
+--------------------------------------------------
+Name    : Apply for Job
+Method  : POST
+URL     : {{baseUrl}}/internships/<job_id>/apply
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+NOTE: Replace <job_id> with actual _id from Get All Jobs response
+
+Expected Response (200):
+{
+  "_id": "...",
+  "title": "Frontend Developer",
+  "applicants": ["<your_user_id>"]
+}
+
+
+================================================================
+📁 FOLDER 5: MENTORS
+================================================================
+
+--------------------------------------------------
+16. Get All Mentors
+--------------------------------------------------
+Name    : Get All Mentors
+Method  : GET
+URL     : {{baseUrl}}/mentors
+Auth    : Bearer Token → <paste token from login>
+Body    : None
+
+Expected Response (200):
+[
+  {
+    "_id": "...",
+    "name": "Dr. Rajesh Kumar",
+    "designation": "Senior Software Engineer",
+    "company": "Google",
+    "batch": "2015",
+    "expertise": ["Web Development", "Cloud Computing", "System Design"],
+    "experience": "8 years",
+    "sessions": 45,
+    "rating": 4.9
+  },
+  ...
+]
+
+
+================================================================
+📋 QUICK SETUP IN POSTMAN
+================================================================
+
+1. Create a new Collection → name it "AlumniNet API"
+
+2. Create a Collection Variable:
+   - Variable : baseUrl
+   - Value    : http://localhost:5000/api
+
+3. Create folders inside the collection:
+   - Auth
+   - Users
+   - Events
+   - Jobs / Internships
+   - Mentors
+
+4. For protected routes, go to:
+   Authorization tab → Type: Bearer Token
+   → Paste the token received from Login or Register response
+
+5. Make sure backend is running:
+   cd Backend
+   npm run dev
+
+6. Make sure MongoDB is running (MongoDB Compass connected)
+
+================================================================
+📝 SAMPLE LOGIN CREDENTIALS (after running seed.js)
+================================================================
+
+Alumni Account:
+  Email    : rahul@example.com
+  Password : password123
+
+Student Account (register manually):
+  Email    : priya@example.com
+  Password : password123
+
+================================================================

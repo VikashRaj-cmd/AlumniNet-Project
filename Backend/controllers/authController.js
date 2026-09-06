@@ -1,55 +1,169 @@
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 const jwt = require('jsonwebtoken');
+const { AppError } = require('../middleware/errorMiddleware');
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
+// Generate short-lived access token (15 minutes)
+const generateAccessToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_ACCESS_EXPIRE || '15m',
+  });
 };
 
-exports.register = async (req, res) => {
+// Generate refresh token and save to DB
+const generateRefreshToken = async (userId, ipAddress) => {
+  const token = RefreshToken.generateToken();
+  const expiresAt = new Date(
+    Date.now() + (parseInt(process.env.JWT_REFRESH_DAYS) || 7) * 24 * 60 * 60 * 1000
+  );
+
+  await RefreshToken.create({
+    token,
+    user: userId,
+    expiresAt,
+    createdByIp: ipAddress,
+  });
+
+  return token;
+};
+
+// Set refresh token as httpOnly cookie
+const setRefreshCookie = (res, refreshToken) => {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: (parseInt(process.env.JWT_REFRESH_DAYS) || 7) * 24 * 60 * 60 * 1000,
+  };
+  res.cookie('refreshToken', refreshToken, cookieOptions);
+};
+
+// Format user response (exclude sensitive fields)
+const formatUserResponse = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  department: user.department,
+  batch: user.batch,
+  company: user.company,
+  designation: user.designation,
+  profileImage: user.profileImage,
+});
+
+exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role, batch, department } = req.body;
-    
+
     const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: 'User already exists' });
+    if (userExists) {
+      return next(new AppError('User already exists with this email.', 400));
+    }
 
     const user = await User.create({ name, email, password, role, batch, department });
-    const token = generateToken(user._id);
+
+    // Generate tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = await generateRefreshToken(user._id, req.ip);
+
+    // Set refresh token cookie
+    setRefreshCookie(res, refreshToken);
 
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      batch: user.batch,
-      token
+      ...formatUserResponse(user),
+      token: accessToken,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    
+
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return next(new AppError('Invalid email or password.', 401));
     }
 
-    const token = generateToken(user._id);
+    // Generate tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = await generateRefreshToken(user._id, req.ip);
+
+    // Set refresh token cookie
+    setRefreshCookie(res, refreshToken);
 
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      batch: user.batch,
-      token
+      ...formatUserResponse(user),
+      token: accessToken,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
+  }
+};
+
+// Refresh access token using refresh token from cookie
+exports.refreshToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return next(new AppError('No refresh token provided.', 401));
+    }
+
+    // Find the refresh token in DB
+    const storedToken = await RefreshToken.findOne({ token: refreshToken });
+
+    if (!storedToken || !storedToken.isActive()) {
+      return next(new AppError('Invalid or expired refresh token. Please log in again.', 401));
+    }
+
+    // Generate new access token
+    const accessToken = generateAccessToken(storedToken.user);
+
+    // Rotate refresh token (optional but recommended for security)
+    const newRefreshToken = await generateRefreshToken(storedToken.user, req.ip);
+    storedToken.isRevoked = true;
+    await storedToken.save();
+
+    // Set new refresh token cookie
+    setRefreshCookie(res, newRefreshToken);
+
+    res.json({ token: accessToken });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Logout — revoke refresh token
+exports.logout = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (refreshToken) {
+      await RefreshToken.findOneAndUpdate(
+        { token: refreshToken },
+        { isRevoked: true }
+      );
+    }
+
+    res.clearCookie('refreshToken');
+    res.json({ message: 'Logged out successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get current logged-in user info
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return next(new AppError('User not found.', 404));
+    }
+    res.json(formatUserResponse(user));
+  } catch (error) {
+    next(error);
   }
 };

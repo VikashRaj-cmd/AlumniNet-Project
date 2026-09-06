@@ -1,28 +1,3 @@
-/**
- * The `node:tty` module provides the `tty.ReadStream` and `tty.WriteStream` classes. In most cases, it will not be necessary or possible to use this module
- * directly. However, it can be accessed using:
- *
- * ```js
- * import tty from 'node:tty';
- * ```
- *
- * When Node.js detects that it is being run with a text terminal ("TTY")
- * attached, `process.stdin` will, by default, be initialized as an instance of `tty.ReadStream` and both `process.stdout` and `process.stderr` will, by
- * default, be instances of `tty.WriteStream`. The preferred method of determining
- * whether Node.js is being run within a TTY context is to check that the value of
- * the `process.stdout.isTTY` property is `true`:
- *
- * ```console
- * $ node -p -e "Boolean(process.stdout.isTTY)"
- * true
- * $ node -p -e "Boolean(process.stdout.isTTY)" | cat
- * false
- * ```
- *
- * In most cases, there should be little to no reason for an application to
- * manually create instances of the `tty.ReadStream` and `tty.WriteStream` classes.
- * @see [source](https://github.com/nodejs/node/blob/v25.x/lib/tty.js)
- */
 declare module "node:tty" {
     import * as net from "node:net";
     /**
@@ -53,10 +28,11 @@ declare module "node:tty" {
          * Allows configuration of `tty.ReadStream` so that it operates as a raw device.
          *
          * When in raw mode, input is always available character-by-character, not
-         * including modifiers. Additionally, all special processing of characters by the
-         * terminal is disabled, including echoing input
+         * including modifiers. Additionally, all special processing of input characters
+         * by the terminal is disabled, including echoing input
          * characters. Ctrl+C will no longer cause a `SIGINT` when
-         * in this mode.
+         * in this mode. This mode does not affect terminal output processing, such as
+         * newline translation on Unix terminals.
          * @since v0.7.7
          * @param mode If `true`, configures the `tty.ReadStream` to operate as a raw device. If `false`, configures the `tty.ReadStream` to operate in its default mode. The `readStream.isRaw`
          * property will be set to the resulting mode.

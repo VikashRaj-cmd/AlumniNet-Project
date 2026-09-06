@@ -172,7 +172,7 @@ declare module "node:buffer" {
              * If `totalLength` is not provided, it is calculated from the `Buffer` instances
              * in `list` by adding their lengths.
              *
-             * If `totalLength` is provided, it is coerced to an unsigned integer. If the
+             * If `totalLength` is provided, it must be an unsigned integer. If the
              * combined length of the `Buffer`s in `list` exceeds `totalLength`, the result is
              * truncated to `totalLength`.
              *
@@ -459,4 +459,9 @@ declare module "node:buffer" {
          */
         type AllowSharedBuffer = Buffer;
     }
+    /**
+     * @deprecated This is intended for internal use, and will be removed once `@types/node` no longer supports
+     * TypeScript versions earlier than 5.7.
+     */
+    type BufferView<T extends NodeJS.ArrayBufferView> = Buffer;
 }
