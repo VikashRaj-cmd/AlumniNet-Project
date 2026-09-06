@@ -1,0 +1,56 @@
+name: Code Quality & Syntax Verification
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+
+jobs:
+  lint-backend:
+    name: Verify Backend Code Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Backend/package-lock.json
+
+      - name: Install Backend dependencies
+        run: |
+          cd Backend
+          npm ci
+
+      - name: Verify Backend syntax and structure
+        run: |
+          cd Backend
+          node --check server.js
+
+  lint-frontend:
+    name: Verify Frontend Build Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install Frontend dependencies
+        run: |
+          cd Frontend
+          npm ci
+
+      - name: Validate Frontend build compilation
+        run: |
+          cd Frontend
+          npm run build

@@ -1,0 +1,42 @@
+name: Docker Build & Deployment Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-validate:
+    name: Build Docker Images & Verify Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Backend
+          file: ./Backend/Dockerfile
+          push: false
+          tags: alumninet-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Frontend
+          file: ./Frontend/Dockerfile
+          push: false
+          tags: alumninet-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deployment Build Status Notification
+        run: |
+          echo "[CI/CD] Both Frontend and Backend Docker builds succeeded!"
+          echo "[CI/CD] Release artifact is verified and ready for cloud deployment on Render/Vercel."

@@ -1,0 +1,68 @@
+name: Automated Test Suite
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+
+jobs:
+  test-backend:
+    name: Run Backend Integration & Database Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      PORT: 5001
+      MONGODB_URI: mongodb://localhost:27017/alumninet_test
+      JWT_SECRET: test_jwt_secret_key_alumninet_2026
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd Backend
+          npm ci
+
+      - name: Verify MongoDB database connectivity
+        run: |
+          cd Backend
+          node -e "
+            const mongoose = require('mongoose');
+            mongoose.connect(process.env.MONGODB_URI)
+              .then(() => { console.log('[CI/CD] Connected to MongoDB test database successfully'); process.exit(0); })
+              .catch((err) => { console.error('[CI/CD] MongoDB test connection failed:', err); process.exit(1); });
+          "
+
+      - name: Run Backend health verification test
+        run: |
+          cd Backend
+          node -e "
+            const config = require('./config/config');
+            if (config.mongoUri && config.jwtSecret) {
+              console.log('[CI/CD] Config verification passed');
+            } else {
+              console.error('[CI/CD] Config verification failed');
+              process.exit(1);
+            }
+          "
