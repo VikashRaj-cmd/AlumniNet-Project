@@ -32,7 +32,7 @@ const initializeSocket = (io) => {
   // ─── CONNECTION HANDLER ─────────────────────────────────────────
   io.on('connection', (socket) => {
     const userId = socket.user._id.toString();
-    console.log(`🟢 Socket connected: ${socket.user.name} (${userId})`);
+    console.log(`[SOCKET] Connected: ${socket.user.name} (${userId})`);
 
     // ─── JOIN PERSONAL ROOM ───────────────────────────────────────
     // Each user joins a room named after their userId
@@ -82,7 +82,7 @@ const initializeSocket = (io) => {
 
     // ─── DISCONNECT ──────────────────────────────────────────────
     socket.on('disconnect', () => {
-      console.log(`🔴 Socket disconnected: ${socket.user.name} (${userId})`);
+      console.log(`[SOCKET] Disconnected: ${socket.user.name} (${userId})`);
 
       // Remove from online users
       onlineUsers.delete(userId);

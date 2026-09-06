@@ -41,7 +41,7 @@ const requiredVars = ['MONGODB_URI', 'JWT_SECRET'];
 const missing = requiredVars.filter((v) => !process.env[v]);
 
 if (missing.length > 0) {
-  console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
+  console.error(`[ERROR] Missing required environment variables: ${missing.join(', ')}`);
   console.error('Please check your .env file.');
   process.exit(1);
 }

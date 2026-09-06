@@ -22,6 +22,9 @@ const internshipRoutes = require('./routes/internshipRoutes');
 const mentorshipRoutes = require('./routes/mentorshipRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const alumniRoutes = require('./routes/alumniRoutes');
+const donationRoutes = require('./routes/donationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -86,6 +89,9 @@ app.use('/api/internships', internshipRoutes);
 app.use('/api/mentors', mentorshipRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/alumni', alumniRoutes);
+app.use('/api/donations', donationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─── ERROR HANDLING ───────────────────────────────────────────────
 app.use(notFoundHandler);
@@ -113,6 +119,6 @@ app.set('io', io);
 // ─── START SERVER ─────────────────────────────────────────────────
 const PORT = config.port;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running in ${config.nodeEnv} mode on port ${PORT}`);
-  console.log(`🔌 Socket.io ready for real-time connections`);
+  console.log(`[SERVER] Running in ${config.nodeEnv} mode on port ${PORT}`);
+  console.log(`[SOCKET] Socket.io ready for real-time connections`);
 });

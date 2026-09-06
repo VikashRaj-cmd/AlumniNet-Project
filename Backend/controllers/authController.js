@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const RefreshToken = require('../models/RefreshToken');
 const jwt = require('jsonwebtoken');
 const { AppError } = require('../middleware/errorMiddleware');
+const { sendWelcomeEmail, sendPasswordResetEmail } = require('../config/mail');
 
 // Generate short-lived access token (15 minutes)
 const generateAccessToken = (id) => {
@@ -16,14 +18,7 @@ const generateRefreshToken = async (userId, ipAddress) => {
   const expiresAt = new Date(
     Date.now() + (parseInt(process.env.JWT_REFRESH_DAYS) || 7) * 24 * 60 * 60 * 1000
   );
-
-  await RefreshToken.create({
-    token,
-    user: userId,
-    expiresAt,
-    createdByIp: ipAddress,
-  });
-
+  await RefreshToken.create({ token, user: userId, expiresAt, createdByIp: ipAddress });
   return token;
 };
 
@@ -38,7 +33,7 @@ const setRefreshCookie = (res, refreshToken) => {
   res.cookie('refreshToken', refreshToken, cookieOptions);
 };
 
-// Format user response (exclude sensitive fields)
+// Format user response
 const formatUserResponse = (user) => ({
   _id: user._id,
   name: user.name,
@@ -61,18 +56,16 @@ exports.register = async (req, res, next) => {
     }
 
     const user = await User.create({ name, email, password, role, batch, department });
-
-    // Generate tokens
     const accessToken = generateAccessToken(user._id);
     const refreshToken = await generateRefreshToken(user._id, req.ip);
-
-    // Set refresh token cookie
     setRefreshCookie(res, refreshToken);
 
-    res.status(201).json({
-      ...formatUserResponse(user),
-      token: accessToken,
-    });
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(user).catch((err) =>
+      console.error('Welcome email failed:', err.message)
+    );
+
+    res.status(201).json({ ...formatUserResponse(user), token: accessToken });
   } catch (error) {
     next(error);
   }
@@ -87,67 +80,46 @@ exports.login = async (req, res, next) => {
       return next(new AppError('Invalid email or password.', 401));
     }
 
-    // Generate tokens
     const accessToken = generateAccessToken(user._id);
     const refreshToken = await generateRefreshToken(user._id, req.ip);
-
-    // Set refresh token cookie
     setRefreshCookie(res, refreshToken);
 
-    res.json({
-      ...formatUserResponse(user),
-      token: accessToken,
-    });
+    res.json({ ...formatUserResponse(user), token: accessToken });
   } catch (error) {
     next(error);
   }
 };
 
-// Refresh access token using refresh token from cookie
 exports.refreshToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.cookies;
-
     if (!refreshToken) {
       return next(new AppError('No refresh token provided.', 401));
     }
 
-    // Find the refresh token in DB
     const storedToken = await RefreshToken.findOne({ token: refreshToken });
-
     if (!storedToken || !storedToken.isActive()) {
       return next(new AppError('Invalid or expired refresh token. Please log in again.', 401));
     }
 
-    // Generate new access token
     const accessToken = generateAccessToken(storedToken.user);
-
-    // Rotate refresh token (optional but recommended for security)
     const newRefreshToken = await generateRefreshToken(storedToken.user, req.ip);
     storedToken.isRevoked = true;
     await storedToken.save();
 
-    // Set new refresh token cookie
     setRefreshCookie(res, newRefreshToken);
-
     res.json({ token: accessToken });
   } catch (error) {
     next(error);
   }
 };
 
-// Logout — revoke refresh token
 exports.logout = async (req, res, next) => {
   try {
     const { refreshToken } = req.cookies;
-
     if (refreshToken) {
-      await RefreshToken.findOneAndUpdate(
-        { token: refreshToken },
-        { isRevoked: true }
-      );
+      await RefreshToken.findOneAndUpdate({ token: refreshToken }, { isRevoked: true });
     }
-
     res.clearCookie('refreshToken');
     res.json({ message: 'Logged out successfully.' });
   } catch (error) {
@@ -155,14 +127,87 @@ exports.logout = async (req, res, next) => {
   }
 };
 
-// Get current logged-in user info
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
-    if (!user) {
-      return next(new AppError('User not found.', 404));
-    }
+    const user = await User.findById(req.user._id).select('-password -resetPasswordToken -resetPasswordExpire');
+    if (!user) return next(new AppError('User not found.', 404));
     res.json(formatUserResponse(user));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Forgot password — generate reset token and send email
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    // Always return success to prevent email enumeration attacks
+    if (!user) {
+      return res.json({ message: 'If that email exists, a reset link has been sent.' });
+    }
+
+    // Generate a secure random reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash the token before storing (don't store plain token in DB)
+    user.resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Token expires in 15 minutes
+    user.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    // Send reset email with plain token (not hashed)
+    await sendPasswordResetEmail(user, resetToken);
+
+    res.json({ message: 'If that email exists, a reset link has been sent.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Reset password — verify token and update password
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return next(new AppError('Password must be at least 6 characters.', 400));
+    }
+
+    // Hash the incoming token to compare with stored hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return next(new AppError('Password reset token is invalid or has expired.', 400));
+    }
+
+    // Update password and clear reset fields
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    // Issue new access token so user is logged in after reset
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = await generateRefreshToken(user._id, req.ip);
+    setRefreshCookie(res, refreshToken);
+
+    res.json({
+      message: 'Password reset successful.',
+      token: accessToken,
+      ...formatUserResponse(user),
+    });
   } catch (error) {
     next(error);
   }

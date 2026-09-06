@@ -24,7 +24,9 @@ const userSchema = new mongoose.Schema({
     softSkills: { type: String }
   },
   skills: [String],
-  profileImage: { type: String, default: '' }
+  profileImage: { type: String, default: '' },
+  resetPasswordToken: { type: String, default: undefined },
+  resetPasswordExpire: { type: Date, default: undefined },
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

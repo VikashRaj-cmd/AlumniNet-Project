@@ -58,7 +58,7 @@ const sendErrorProd = (err, res) => {
     });
   } else {
     // Programming/unknown errors: don't leak details
-    console.error('ERROR 💥:', err);
+    console.error('[ERROR] Unhandled internal error:', err);
     res.status(500).json({
       status: 'error',
       message: 'Something went wrong!',

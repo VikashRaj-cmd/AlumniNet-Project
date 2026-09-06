@@ -279,7 +279,7 @@ async function seedDatabase() {
     const createdMentors = await Mentor.insertMany(sampleMentors);
     console.log(`Created ${createdMentors.length} mentors`);
 
-    console.log('\n✅ Database seeded successfully!');
+    console.log('\nDatabase seeded successfully!');
     console.log('\nSample Login Credentials:');
     console.log('Email: rahul@example.com');
     console.log('Password: password123');
